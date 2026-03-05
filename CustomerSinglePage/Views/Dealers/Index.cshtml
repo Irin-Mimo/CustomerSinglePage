@@ -1,0 +1,193 @@
+﻿@{
+    ViewData["Title"] = "Dealer Management";
+}
+
+<div class="container mt-4">
+    <h2>Dealer Management Form</h2>
+
+    <form id="dealerForm">
+        <input type="hidden" id="dealerId" />
+        <div class="row">
+            <div class="col-md-3">
+                <input type="text" id="name" class="form-control" placeholder="Name" required />
+            </div>
+            <div class="col-md-3">
+                <input type="text" id="address" class="form-control" placeholder="Address" required />
+            </div>
+            <div class="col-md-2">
+                <input type="text" id="phone" class="form-control" placeholder="Phone" required />
+            </div>
+            <div class="col-md-2">
+                <input type="number" id="dueAmount" class="form-control" placeholder="Due" />
+            </div>
+            <div class="col-md-2">
+                <select id="marketingId" class="form-control" required>
+                    <option value="">Select Marketing Emp</option>
+                    @foreach (var m in ViewBag.MarketingList)
+                    {
+                        <option value="@m.MarketingId">@m.Name</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <br />
+        <button type="submit" id="btnSave" class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" onclick="clearForm()">Clear</button>
+    </form>
+
+    <hr />
+
+    <div class="row mb-2">
+        <h4>Dealer List</h4>
+        <div class="d-flex justify-content-end mb-2">
+            <input type="text" id="searchDealer" class="form-control" style="width:300px;" placeholder="Search..." />
+        </div>
+    </div>
+
+    <table class="table table-bordered mt-3">
+        <thead>
+            <tr>
+                <th style="cursor:pointer" onclick="sortByName()">
+                    Name <span id="nameSortIcon">▲</span>
+                </th>
+                <th>Address</th>
+                <th>Phone</th>
+                <th>Due</th>
+                <th>Marketing</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="dealerTable"></tbody>
+    </table>
+
+    <nav>
+        <ul class="pagination" id="dealerPagination"></ul>
+    </nav>
+</div>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        $(document).ready(function() {
+            let currentPage = 1;
+            const pageSize = 5;
+            let currentSearch = "";
+            let nameAsc = true;
+
+            function loadDealers() {
+                $.get("/Dealers/GetPaged", {
+                    search: currentSearch,
+                    page: currentPage,
+                    pageSize: pageSize,
+                    sortColumn: "Name",
+                    sortAsc: nameAsc
+                }, function(res) {
+                    let rows = "";
+                    res.data.forEach(d => {
+                        rows += `<tr>
+                            <td>${d.name}</td>
+                            <td>${d.address}</td>
+                            <td>${d.phone}</td>
+                            <td>${d.dueAmount}</td>
+                            <td>${d.marketingName}</td>
+                            <td>
+                                <button class="btn btn-warning btn-sm" onclick="editDealer(${d.dealerId})">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteDealer(${d.dealerId})">Delete</button>
+                            </td>
+                        </tr>`;
+                    });
+                    $("#dealerTable").html(rows);
+
+                    let pagination = "";
+                    for (let i = 1; i <= res.totalPages; i++) {
+                        pagination += `<li class="page-item ${i === res.currentPage ? 'active' : ''}">
+                            <a class="page-link" href="#" onclick="gotoPage(${i})">${i}</a>
+                        </li>`;
+                    }
+                    $("#dealerPagination").html(pagination);
+                });
+            }
+
+            window.gotoPage = function(page) {
+                currentPage = page;
+                loadDealers();
+            }
+
+            $("#searchDealer").on("keyup", function() {
+                currentSearch = $(this).val();
+                currentPage = 1;
+                loadDealers();
+            });
+
+            window.sortByName = function() {
+                nameAsc = !nameAsc;
+                $("#nameSortIcon").text(nameAsc ? "▲" : "▼");
+                currentPage = 1;
+                loadDealers();
+            }
+
+            $("#dealerForm").submit(function(e) {
+                e.preventDefault();
+                const dealer = {
+                    dealerId: $("#dealerId").val(),
+                    name: $("#name").val(),
+                    address: $("#address").val(),
+                    phone: $("#phone").val(),
+                    dueAmount: $("#dueAmount").val(),
+                    marketingId: $("#marketingId").val()
+                };
+                $.post("/Dealers/Save", dealer, function() {
+                    Swal.fire($("#dealerId").val() > 0 ? 'Updated!' : 'Saved!',
+                              $("#dealerId").val() > 0 ? 'Dealer updated.' : 'Dealer saved.',
+                              'success');
+                    clearForm();
+                    loadDealers();
+                });
+            });
+
+            window.editDealer = function(id) {
+                $.get("/Dealers/GetDealer/" + id, function(d) {
+                    $("#dealerId").val(d.dealerId);
+                    $("#name").val(d.name);
+                    $("#address").val(d.address);
+                    $("#phone").val(d.phone);
+                    $("#dueAmount").val(d.dueAmount);
+                    $("#marketingId").val(d.marketingId);
+                    $("#btnSave").text("Update").removeClass("btn-primary").addClass("btn-success");
+                });
+            }
+
+            window.deleteDealer = function(id) {
+                Swal.fire({
+                    title: 'Are you sure?',
+                    text: "This dealer will be deleted!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Yes, delete!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.post("/Dealers/Delete/" + id, function () {
+                            Swal.fire('Deleted!', 'Dealer has been deleted.', 'success');
+                            loadDealers();
+                        });
+                    }
+                });
+            }
+
+            function clearForm() {
+                $("#dealerId").val('');
+                $("#dealerForm")[0].reset();
+                $("#btnSave").text("Save").removeClass("btn-success").addClass("btn-primary");
+            }
+
+            window.clearForm = clearForm;
+
+            // Initial load
+            loadDealers();
+        });
+    </script>
+}

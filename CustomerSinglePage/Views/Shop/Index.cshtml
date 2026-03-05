@@ -1,0 +1,285 @@
+﻿@{
+    ViewData["Title"] = "Shop Management";
+}
+
+<div class="container mt-4">
+
+    <!-- Shop Form Card -->
+    <div class="card shadow-sm p-4 rounded-4">
+        <h4 class="mb-4 fw-bold text-primary">🏬 Shop Management Form</h4>
+
+        <form id="shopForm">
+            <input type="hidden" id="shopId" />
+
+            <div class="row g-3">
+
+                <!-- Shop Name -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">🏷 Shop Name</label>
+                    <input type="text" id="shopName" class="form-control shadow-sm border-2 rounded-3" placeholder="Enter Shop Name" required />
+                </div>
+
+                <!-- Owner Name -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">👤 Owner Name</label>
+                    <input type="text" id="ownerName" class="form-control shadow-sm border-2 rounded-3" placeholder="Enter Owner Name" required />
+                </div>
+
+                <!-- Phone -->
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small text-muted">📞 Phone</label>
+                    <input type="text" id="phone" class="form-control shadow-sm border-2 rounded-3" placeholder="01XXXXXXXXX" />
+                </div>
+
+                <!-- Address -->
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small text-muted">📍 Address</label>
+                    <input type="text" id="address" class="form-control shadow-sm border-2 rounded-3" placeholder="Enter Address" />
+                </div>
+
+                <!-- Visit Date -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">📅 Visit Date</label>
+                    <input type="date" id="date" name="date" class="form-control shadow-sm border-2 rounded-3" required />
+                </div>
+
+                <!-- Marketing Dropdown -->
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">💼 Marketing</label>
+                    <select id="marketingId" class="form-select shadow-sm border-2 rounded-3" required>
+                        <option value="">Select Marketing Emp</option>
+                        @foreach (var m in ViewBag.MarketingList)
+                        {
+                            <option value="@m.MarketingId">@m.Name</option>
+                        }
+                    </select>
+                </div>
+
+            </div>
+
+            <!-- Buttons -->
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" id="btnSave" class="btn btn-primary px-4 rounded-3 shadow-sm">💾 Save</button>
+                <button type="button" class="btn btn-secondary px-4 rounded-3 shadow-sm" onclick="clearForm()">Clear</button>
+            </div>
+        </form>
+    </div>
+
+    <hr class="my-4">
+
+    <!-- Search & Table -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="fw-bold text-primary">Shop List</h4>
+        <input type="text" id="searchShop" class="form-control shadow-sm border-2 rounded-3" style="width:300px;" placeholder="Search Shop Name..." />
+    </div>
+
+    <table class="table table-hover table-bordered mt-3 shadow-sm rounded-4">
+        <thead class="table-light">
+            <tr>
+                <th style="cursor:pointer" onclick="sortByName()">Shop Name <span id="nameSortIcon">▲</span></th>
+                <th>Owner</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th>Visit Date</th>
+                <th>Marketing</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="shopTable"></tbody>
+    </table>
+
+    <!-- Pagination -->
+    <nav>
+        <ul class="pagination" id="shopPagination"></ul>
+    </nav>
+
+</div>
+
+<!-- Optional CSS for premium styling -->
+<style>
+    .form-control:focus,
+    .form-select:focus,
+    textarea:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 8px rgba(13, 110, 253, 0.25);
+    }
+
+    .form-label {
+        margin-bottom: 4px;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+    }
+
+    .table th {
+        font-weight: 600;
+    }
+</style>
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        // Format date for table display: dd-MMM-yyyy
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = months[date.getMonth()];
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+
+        // Format date for input[type=date]: yyyy-MM-dd
+        function formatDateForInput(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${year}-${month}-${day}`;
+        }
+
+        let currentPage = 1;
+        const pageSize = 5;
+        let currentSearch = "";
+        let nameAsc = true;
+
+        $(document).ready(function () {
+            loadShops();
+
+            $("#searchShop").on("keyup", function () {
+                currentSearch = $(this).val();
+                currentPage = 1;
+                loadShops();
+            });
+        });
+
+        function sortByName() {
+            nameAsc = !nameAsc;
+            $("#nameSortIcon").text(nameAsc ? "▲" : "▼");
+            currentPage = 1;
+            loadShops();
+        }
+
+        function loadShops() {
+            $.get("/Shop/GetPaged", {
+                search: currentSearch,
+                page: currentPage,
+                pageSize: pageSize,
+                sortColumn: "ShopName",
+                sortAsc: nameAsc
+            }, function (res) {
+                let rows = "";
+                res.data.forEach(s => {
+                           rows += `
+        <tr style="
+            background-color:${s.marketingColor}15;
+            border-left:6px solid ${s.marketingColor};
+        ">
+              <td>${s.shopName}</td>
+              <td>${s.ownerName}</td>
+              <td>${s.phone}</td>
+              <td>${s.address}</td>
+              <td>${formatDate(s.date)}</td>
+              <td>${s.marketingName}</td>
+              <td>
+                  <button class="btn btn-warning btn-sm" onclick="editShop(${s.shopId})">
+                      <i class="bi bi-pencil-fill"></i>
+                  </button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteShop(${s.shopId})">
+                      <i class="bi bi-trash-fill"></i>
+                  </button>
+              </td>
+        </tr>`;
+                });
+
+                $("#shopTable").html(rows);
+
+                let pagination = "";
+                for (let i = 1; i <= res.totalPages; i++) {
+                    pagination += `<li class="page-item ${i === res.currentPage ? 'active' : ''}">
+                                    <a class="page-link" href="#" onclick="gotoPage(${i})">${i}</a>
+                                   </li>`;
+                }
+                $("#shopPagination").html(pagination);
+            });
+        }
+
+        function gotoPage(page) {
+            currentPage = page;
+            loadShops();
+        }
+
+        $("#shopForm").submit(function (e) {
+            e.preventDefault();
+
+            // যদি user date না দেয়, তাহলে আজকের date পাঠানো হবে
+            const dateVal = $("#date").val() ? $("#date").val() : new Date().toISOString().split('T')[0];
+
+            const shop = {
+                id: $("#shopId").val(),
+                shopName: $("#shopName").val(),
+                ownerName: $("#ownerName").val(),
+                phone: $("#phone").val(),
+                address: $("#address").val(),
+                date: dateVal,
+                marketingId: $("#marketingId").val()
+            };
+
+            $.post("/Shop/Save", shop, function () {
+                Swal.fire(
+                    $("#shopId").val() > 0 ? 'Updated!' : 'Saved!',
+                    $("#shopId").val() > 0 ? 'Shop updated successfully.' : 'Shop saved successfully.',
+                    'success'
+                );
+
+                clearForm();
+                loadShops();
+            });
+        });
+
+        function editShop(id) {
+            $.get("/Shop/GetShop/" + id, function (s) {
+                $("#shopId").val(s.shopId);
+                $("#shopName").val(s.shopName);
+                $("#ownerName").val(s.ownerName);
+                $("#phone").val(s.phone);
+                $("#address").val(s.address);
+                $("#date").val(formatDateForInput(s.date));
+                $("#marketingId").val(s.marketingId);
+
+                $("#btnSave").text("Update").removeClass("btn-primary").addClass("btn-success");
+            });
+        }
+
+        function deleteShop(id) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "This shop will be deleted!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.post("/Shop/Delete/" + id, function () {
+                        Swal.fire('Deleted!', 'Shop has been deleted.', 'success');
+                        loadShops();
+                    });
+                }
+            });
+        }
+
+        function clearForm() {
+            $("#shopId").val('');
+            $("#shopForm")[0].reset();
+            $("#btnSave").text("Save").removeClass("btn-success").addClass("btn-primary");
+        }
+    </script>
+}

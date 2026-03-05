@@ -1,0 +1,255 @@
+﻿@model IEnumerable<CustomerSinglePage.Models.Customer>
+@{
+    ViewData["Title"] = "Customer Management";
+}
+
+<h1 class="display-4">Customer Information</h1>
+
+<form id="customerForm" enctype="multipart/form-data">
+    <div class="container-fluid">
+        <div class="row">
+            <input type="hidden" id="customerId" name="customerId" />
+
+            <div class="col-6">
+                <!-- Customer Fields -->
+                <div class="row mb-2">
+                    <label class="col-form-label col-form-label-sm col-3" for="name">Customer Name</label>
+                    <div class="col-8">
+                        <input type="text" id="name" name="name" class="form-control form-control-sm" required />
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <label class="col-form-label col-form-label-sm col-3" for="address">Address</label>
+                    <div class="col-8">
+                        <input type="text" id="address" name="address" class="form-control form-control-sm" required />
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <label class="col-form-label col-form-label-sm col-3" for="purchasedate">Payment Date</label>
+                    <div class="col-8">
+                        <input type="date" id="purchasedate" name="purchasedate" class="form-control form-control-sm" required />
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <label class="col-form-label col-form-label-sm col-3" for="phone">Phone</label>
+                    <div class="col-8">
+                        <input type="text" id="phone" name="phone" class="form-control form-control-sm" required />
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <label class="col-form-label col-form-label-sm col-3" for="creditLimit">Credit Limit</label>
+                    <div class="col-8">
+                        <input type="number" step="0.01" id="creditLimit" name="creditLimit" class="form-control form-control-sm" required />
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <label class="col-form-label col-form-label-sm col-3" for="customerType">Customer Type</label>
+                    <div class="col-8">
+                        <select id="customerType" name="customerType" class="form-select form-select-sm">
+                            <option value="Dealer">Dealer</option>
+                            <option value="Retailer">Retailer</option>
+                            <option value="Corporate">Corporate</option>
+                            <option value="Export">Export</option>
+                            <option value="Online">Online</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row mb-2 align-items-center">
+                    <label class="col-form-label col-form-label-sm col-3" for="photo">Photo</label>
+                    <div class="col-6">
+                        <input type="file" id="photo" name="photo" onchange="previewImage(event)" accept="image/*" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-3">
+                        <img id="photoPreview" class="img-thumbnail d-none" style="width:40px;height:40px;object-fit:cover;" />
+                    </div>
+                </div>
+                <div class="d-flex justify-content-center mb-4 mt-3">
+                    <button type="button" id="btnSave" class="btn btn-primary me-2">Save</button>
+                    <button type="button" id="btnEdit" class="btn btn-success me-2" style="display:none;">Update</button>
+                    <button type="button" id="btnDelete" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+
+            <!-- Delivery Address Table -->
+            <div class="col-6">
+                <h3 class="display-4">Customer Address Info</h3>
+                <table class="table table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>Person</th>
+                            <th>Address</th>
+                            <th>Phone</th>
+                            <th>Due Amount</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deliveryAddressContainer"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</form>
+
+<hr />
+
+<!-- Customer List -->
+<h2 class="display-5 mb-2">Customer List</h2>
+<div class="row">
+    <div class="col-12">
+        <table id="customerTable" class="table table-bordered table-sm text-center">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Address</th>
+                    <th>Customer Type</th>
+                    <th>Payment Date</th>
+                    <th>Credit Limit</th>
+                    <th>Remaining Due</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var cust in Model)
+                {
+                    var totalDue = cust.DeliveryAddresses.Sum(d => d.DueAmount);
+                    var remainingDue = totalDue - cust.CreditLimit;
+                    <tr onclick="editCustomer(@cust.CustomerId)">
+                        <td>@cust.Name</td>
+                        <td>@cust.Address</td>
+                        <td>@cust.CustomerType</td>
+                        <td>@(cust.PurchaseDate != DateTime.MinValue ? cust.PurchaseDate.ToString("dd-MMM-yyyy") : "N/A")</td>
+                        <td>@cust.CreditLimit.ToString("0.00")</td>
+                        <td>@remainingDue.ToString("0.00")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let addressCount = 0;
+        const deliveryContainer = document.getElementById('deliveryAddressContainer');
+
+        function createDeliveryRow(index, address = "", contactPerson = "", phone = "", dueAmount = 0) {
+            const row = document.createElement('tr');
+            row.classList.add('deliveryAddressRow');
+            row.id = `deliveryAddressRow_${index}`;
+            row.innerHTML = `
+                <td><input type="text" name="DeliveryAddresses[${index}].Address" class="form-control form-control-sm" value="${address}" /></td>
+                <td><input type="text" name="DeliveryAddresses[${index}].ContactPerson" class="form-control form-control-sm" value="${contactPerson}" /></td>
+                <td><input type="text" name="DeliveryAddresses[${index}].Phone" class="form-control form-control-sm" value="${phone}" /></td>
+                <td><input type="number" step="0.01" name="DeliveryAddresses[${index}].DueAmount" class="form-control form-control-sm" value="${dueAmount}" /></td>
+                <td>
+                    <button type="button" class="btn btn-danger btn-sm removeDeliveryAddressBtn">Delete</button>
+                    <button type="button" class="btn btn-success btn-sm addDeliveryAddressBtn">Add</button>
+                </td>
+            `;
+            return row;
+        }
+
+        // Initialize first row
+        deliveryContainer.appendChild(createDeliveryRow(addressCount++));
+
+        // Add/Remove Row Event Delegation
+        deliveryContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('removeDeliveryAddressBtn')) {
+                e.target.closest('tr').remove();
+                reIndexDeliveryRows();
+            }
+            if (e.target.classList.contains('addDeliveryAddressBtn')) {
+                deliveryContainer.appendChild(createDeliveryRow(addressCount++));
+            }
+        });
+
+        function reIndexDeliveryRows() {
+            const rows = deliveryContainer.querySelectorAll('.deliveryAddressRow');
+            addressCount = 0;
+            rows.forEach(row => {
+                row.querySelectorAll('input').forEach(input => {
+                    const parts = input.name.split('.');
+                    parts[0] = `DeliveryAddresses[${addressCount}]`;
+                    input.name = parts.join('.');
+                });
+                addressCount++;
+            });
+        }
+
+        function previewImage(event) {
+            const input = event.target;
+            const preview = document.getElementById('photoPreview');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    preview.src = e.target.result;
+                    preview.classList.remove('d-none');
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Save Customer
+        document.getElementById('btnSave').addEventListener('click', async function() {
+            const form = document.getElementById('customerForm');
+            try {
+                const response = await fetch('/Customers/Save', { method: 'POST', body: new FormData(form) });
+                if (!response.ok) throw new Error('Customer save failed!');
+                alert('Customer saved successfully!');
+                window.location.reload();
+            } catch(err) { alert(err.message); }
+        });
+
+        // Edit Customer
+        function editCustomer(customerId) {
+            $.get('/Customers/GetCustomer', { id: customerId }, response => {
+                if (!response) return;
+                $("#customerId").val(response.customerId);
+                $("#name").val(response.name);
+                $("#address").val(response.address);
+                $("#customerType").val(response.customerType);
+                $("#purchasedate").val(response.purchaseDate?.split('T')[0]);
+                $("#phone").val(response.phone);
+                $("#creditLimit").val(response.creditLimit);
+
+                if(response.photo)
+                    $("#photoPreview").attr("src", "/Images/"+response.photo).removeClass("d-none");
+                else
+                    $("#photoPreview").addClass("d-none");
+
+                deliveryContainer.innerHTML = '';
+                addressCount = 0;
+                response.deliveryAddress.forEach(addr => {
+                    deliveryContainer.appendChild(createDeliveryRow(addressCount++, addr.address, addr.contactPerson, addr.phone, addr.dueAmount || 0));
+                });
+
+                $("#btnSave").hide();
+                $("#btnEdit").show();
+            });
+        }
+
+        // Update Customer
+        document.getElementById('btnEdit').addEventListener('click', async function() {
+            const form = document.getElementById('customerForm');
+            try {
+                const response = await fetch('/Customers/Update', { method: 'POST', body: new FormData(form) });
+                if (!response.ok) throw new Error('Customer update failed!');
+                alert('Customer updated successfully!');
+                window.location.reload();
+            } catch(err) { alert(err.message); }
+        });
+
+        // Delete Customer
+        document.getElementById('btnDelete').addEventListener('click', async function() {
+            const customerId = $("#customerId").val();
+            if(!customerId) return alert("Please select a customer!");
+            if(confirm("Are you sure to delete this customer?")) {
+                try {
+                    const response = await fetch(`/Customers/Delete/${customerId}`, { method: "POST" });
+                    if(!response.ok) throw new Error("Delete failed!");
+                    alert("Customer deleted!");
+                    window.location.reload();
+                } catch(err) { alert(err.message); }
+            }
+        });
+    </script>
+}
